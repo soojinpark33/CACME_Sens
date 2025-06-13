@@ -1,0 +1,94 @@
+Title:
+Table 3
+
+Data:
+   File is jobs.dat ;
+
+Variable:
+   Names are     treat       sex         mot_atte    race        marital     educ        
+     assert      econhard    depress1    age         depress2    mastery     
+     comply      s1          s2          ;  
+        
+   USEVARIABLES ARE  treat       sex         mot_atte    race        marital     educ        
+     assert      econhard    depress1    age         depress2    mastery     
+     s1          s2 int;
+     Missing are . ;
+
+   CLASSES = s(2);       
+   TRAINING = s1-s2;     
+                             
+    Define:
+    int = treat*mastery;   ! define interaction effect
+    center depress1 mot_atte sex age marital race educ
+         assert econhard (grandmean);
+
+    ANALYSIS:
+    TYPE IS MIXTURE;
+    process = 8(starts);
+
+   MODEL: 
+
+    %OVERALL%
+      depress2 on treat mastery int depress1 mot_atte sex age marital race educ
+      assert econhard;  ! outcome model
+      mastery on treat depress1 mot_atte sex age marital race educ assert econhard; ! mediator model               
+      s on depress1 mot_atte sex age marital race educ assert econhard;  ! compliance model                         
+      [s#1](clogit);
+	  [mastery];                                                          	  
+      [depress2];                                                             
+      mastery;                                                             
+      depress2;                                                              
+      mastery WITH depress2;                                                
+
+     %s#1% !never takers
+      depress2 on treat (nbeta1);
+      depress2 on int (nbeta2);
+      depress2 on mastery (nbeta3);
+      mastery on treat (nalpha2);
+      [mastery] (nalpha1);
+
+     %s#2%  !compliers
+      depress2 on treat (beta1);
+	  depress2 on mastery (beta2);
+	  depress2 on int (beta3);
+      mastery on treat (alpha2);
+     [mastery] (alpha1);                                                          
+     [depress2];
+    mastery WITH depress2@0;   !fix the correlation between mediator and outcome to be 0                                          
+
+  MODEL CONSTRAINT:
+    nalpha2=0.136;nbeta1=-0.147;nbeta2=0.04;
+    ! define new parameters not in the model;
+    	new(pic pin cacme1 cacme0 cande1 cande0 cace med1 
+    	med0 unmed1 unmed0 itt nacme1 nacme0 nande1 nande0);
+
+    ! compute pattern proportions;
+    	pin = exp(clogit)/(1+ exp(clogit));
+	pic = 1-exp(clogit)/(1+ exp(clogit));
+
+    ! compute compliers effects
+	cacme1 = alpha2*(beta2 +beta3);
+	cacme0 = alpha2*beta2;
+	cande1 = beta1 + beta3*(alpha1 + alpha2);
+    	cande0 = beta1 + beta3*(alpha1);
+    	cace =cacme1 + cande0;
+
+    ! compute never takers effects
+    	nacme1 = nalpha2*(nbeta2 +nbeta3);
+	nacme0 = nalpha2*nbeta2;
+	nande1 = nbeta1 + nbeta3*(nalpha1 + nalpha2);
+    	nande0 = nbeta1 + nbeta3*(nalpha1);
+
+    ! compute itt effects
+	med1 = cacme1*pic + nacme1*pin;
+	med0 = cacme0*pic + nacme0*pin;
+	unmed1 = cande1*pic + nande1*pin;
+	unmed0 = cande0*pic + nande0*pin;
+    	itt = med1 + unmed0;
+
+      OUTPUT: 
+    tech1 tech8;
+
+     savedata:   file is med_0.5_0.5.txt;
+     Estimates= est.dat;
+      save is cprob;

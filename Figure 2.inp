@@ -1,0 +1,94 @@
+Title:
+Figure 2
+
+Data:
+   File is jobs.dat ;
+
+Variable:
+   Names are     treat       sex         mot_atte    race        marital     educ        
+     assert      econhard    depress1    age         depress2    mastery     
+     comply      s1          s2           ;     
+   
+   USEVARIABLES ARE     treat    sex         mot_atte    race        marital     educ        
+     assert      econhard    depress1    age         depress2    mastery     
+      u ;
+
+   CLASSES = tr(2) s(2); 
+   Missing are . ;        
+   categorical= treat u;                       
+ 
+    Define:
+    u=_missing;
+    if (s1 eq 1 and treat eq 1) then u=1;
+    if (s1 eq 0 and treat eq 1) then u=0;
+    
+    center depress1 mot_atte sex age marital race educ
+         assert econhard (grandmean);
+      
+        
+    ANALYSIS:
+    TYPE IS MIXTURE;
+    process = 8(starts);
+
+    MODEL: 
+    %OVERALL%
+      depress2 on depress1 mot_atte sex age marital race educ
+      assert econhard;  
+      mastery on depress1 mot_atte sex age marital race educ assert econhard;               
+      s on depress1 mot_atte sex age marital race educ assert econhard;                           
+      [s#1](clogit);
+	  [mastery];                                                          	  
+      [depress2];                                                             
+      mastery (sig2);                                                             
+      depress2 (sig1);                                                             
+      mastery WITH depress2;                                              
+
+    %tr#1.s#1%
+    [treat$1@-15]; !treatment
+    [u$1@-15]; !never taker
+    [mastery](a1);
+    [depress2](a2);  
+    depress2 WITH mastery(a3);
+  
+      %tr#1.s#2%
+    [treat$1@-15] !treatment
+    [u$1@15]; !complier
+    [mastery](alpha1);
+    [depress2](beta1);  
+    mastery WITH depress2(covt); 
+
+    %tr#2.s#1%
+    [treat$1@15]; !control
+    [u$1@-15]; !never taker
+    [mastery](a1);
+    [depress2](a2);  
+    depress2 WITH mastery(a3);
+
+      %tr#2.s#2%
+    [treat$1@15] !control
+    [u$1@15]; !complier
+    [mastery](alpha0);
+    [depress2](beta0);
+    mastery WITH depress2(covc);  
+
+  MODEL CONSTRAINT:
+    Loop(rho, -0.9,0.9,0.1);
+    plot(delta1 delta0);
+
+    delta1=(1-exp(clogit)/(1+ exp(clogit)))*(alpha1-alpha0)*
+    (SQRT(sig1))/(SQRT(sig2))*
+    (covt/(SQRT(sig1)*SQRT(sig2))-rho*SQRT((1-covt/
+    (SQRT(sig1)*SQRT(sig2))^2)/(1-rho^2)));
+
+    delta0=(1-exp(clogit)/(1+ exp(clogit)))*
+    (alpha1-alpha0)*(SQRT(sig1))/(SQRT(sig2))*
+    (covc/(SQRT(sig1)*SQRT(sig2))-rho*SQRT((1-covc/
+    (SQRT(sig1)*SQRT(sig2))^2)/(1-rho^2)));
+
+    OUTPUT: 
+    tech1 tech8 stand; 
+    PLOT: 
+    TYPE IS PLOT3 ; 
+    savedata:   file is med.txt;
+    Estimates= est.dat;
+    save is cprob;
